@@ -1,0 +1,38 @@
+name: Build Server and Client docker images
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build-app:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: tobijes/sonos-control:latest
+  
+
+  # deploy-production:
+  #   needs: [build-server, build-client]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Make API request to Watchtower to refresh images on VPS
+  #       run: |
+  #         curl --request GET \
+  #         --url https://watchtower.tobijes.com/v1/update \
+  #         --header 'authorization: Bearer ${{ secrets.WATCHTOWER_TOKEN }}'
