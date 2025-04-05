@@ -1,0 +1,9 @@
+services:
+  app:
+    image: sonos
+    ports:
+      - 8000:80
+    environment:
+      REDIRECT_URI:
+      CLIENT_ID:
+      CLIENT_SECRET:
