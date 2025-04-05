@@ -24,7 +24,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
-          tags: tobijes/sonos-control:latest
+          tags: ghcr.io/tobijes/sonos-control--api:latest
   
 
   # deploy-production:
