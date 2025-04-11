@@ -9,7 +9,6 @@ import urllib
 
 import httpx
 from fastapi import FastAPI
-from dotenv import load_dotenv
 
 from src.models import Authorization, DateTimeEncoder
 from src.models import  NotAuthorizedError
@@ -21,7 +20,6 @@ ACCESS_URL = "https://api.sonos.com/login/v3/oauth/access"
 AUTHORIZATION_FILE = Path("authorization.json")
 
 # Get environment variables
-load_dotenv()
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 REDIRECT_URI = os.getenv("REDIRECT_URI")
@@ -92,9 +90,26 @@ def load_authorization(validate=True):
     if validate:
         if authorization.last_refreshed + timedelta(seconds=authorization.expires_in) < datetime.now():
             print("Authorization loaded, but invalid")
+            
+            if authorization := refresh_token(authorization.refresh_token):
+                return authorization
+
             return None
         
     print("Authorization loaded from file")
+    return authorization
+
+def refresh_token(refresh_token):
+    print("Refreshing token...")
+    headers = get_credentials_headers()
+    url_params = {
+        "grant_type": "refresh_token",
+        "refresh_token" : refresh_token
+    }
+
+    token_response = httpx.post(ACCESS_URL, params=url_params, headers=headers)
+    token_json = token_response.json()
+    authorization = Authorization(**token_json)
     return authorization
 
 async def task_refresh_authorization(app: FastAPI):
@@ -108,13 +123,5 @@ async def task_refresh_authorization(app: FastAPI):
         print(f"Sleeping for {sleep_time.seconds} seconds")
         await asyncio.sleep(sleep_time.seconds)
 
-        print("Refreshing token...")
-        headers = get_credentials_headers()
-        url_params = {
-            "grant_type": "refresh_token",
-            "refresh_token" : authorization.refresh_token
-        }
-
-        token_response = httpx.post(ACCESS_URL, params=url_params, headers=headers)
-        print(token_response.text)
+        authorization = refresh_token(authorization.refresh_token)
 
