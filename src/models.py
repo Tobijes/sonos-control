@@ -20,6 +20,9 @@ class Group:
 class NotAuthorizedError(Exception):
     pass
 
+class OAuthStateMismatchError(Exception):
+    pass
+
 class DateTimeEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, datetime):
