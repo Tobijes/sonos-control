@@ -24,7 +24,7 @@ AUTHORIZATION_FILE = Path("authorization.json")
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 REDIRECT_URI = os.getenv("REDIRECT_URI")
-print("Redirect URL", REDIRECT_URI)
+print("Redirect URL", REDIRECT_URI, flush=True)
 
 class SonosAuth():
     authorization: Authorization = None
@@ -77,7 +77,7 @@ class SonosAuth():
         headers = self.get_credentials_headers()
 
         token_response = httpx.post(ACCESS_URL, data=token_data, headers=headers)
-        print(token_response.text)
+        print(token_response.text, flush=True)
 
         token_json = token_response.json()
         self.authorization = Authorization(**token_json)
@@ -88,7 +88,7 @@ class SonosAuth():
         json_str = json.dumps(asdict(self.authorization), cls=DateTimeEncoder)
         with open(AUTHORIZATION_FILE, "w") as f:
             f.write(json_str)
-        print("Authorization saved")
+        print("Authorization saved", flush=True)
 
     def load_authorization(self):
         if not AUTHORIZATION_FILE.is_file():
@@ -100,7 +100,7 @@ class SonosAuth():
         json_dict = json.loads(json_str)
         json_dict["last_refreshed"] = datetime.fromisoformat(json_dict["last_refreshed"])
         
-        print("Authorization loaded from file")
+        print("Authorization loaded from file", flush=True)
         self.authorization = Authorization(**json_dict)
         
         if self.authorization.last_refreshed + timedelta(seconds=self.authorization.expires_in) < datetime.now():
@@ -109,7 +109,7 @@ class SonosAuth():
 
 
     def refresh_token(self):
-        print("Refreshing token...")
+        print("Refreshing token...", flush=True)
         headers = self.get_credentials_headers()
         url_params = {
             "grant_type": "refresh_token",
@@ -117,7 +117,7 @@ class SonosAuth():
         }
 
         token_response = httpx.post(ACCESS_URL, params=url_params, headers=headers)
-        print(token_response.text)
+        print(token_response.text, flush=True)
         token_json = token_response.json()
         self.authorization = Authorization(**token_json)
 
@@ -130,7 +130,7 @@ class SonosAuth():
 
             refresh_time = self.authorization.last_refreshed + timedelta(seconds=self.authorization.expires_in, hours=-1)
             sleep_time = refresh_time - datetime.now()
-            print(f"Sleeping for {sleep_time.seconds} seconds")
+            print(f"Sleeping for {sleep_time.seconds} seconds", flush=True)
             await asyncio.sleep(sleep_time.seconds)
 
             self.authorization = self.refresh_token()

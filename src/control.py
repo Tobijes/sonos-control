@@ -10,7 +10,7 @@ from src.models import Group
 CONTROL_URL_BASE = "https://api.ws.sonos.com/control/api/v1/"
 
 ALLOW_WRITE = bool(os.getenv("ALLOW_WRITE", False))
-print("Allow write to Sonos", ALLOW_WRITE)
+print("Allow write to Sonos", ALLOW_WRITE, flush=True)
 
 class SonosControl:
     sonos_auth: SonosAuth
@@ -49,7 +49,7 @@ class SonosControl:
         if len(groups) == 0:
             return None
         groups = [Group(id=g["id"], name=g["name"], playback_state=g["playbackState"]) for g in groups]
-        print(groups)
+        print(groups, flush=True)
 
         return groups
 
