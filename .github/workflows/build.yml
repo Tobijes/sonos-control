@@ -29,12 +29,12 @@ jobs:
           tags: ghcr.io/tobijes/sonos-control--api:latest
   
 
-  # deploy-production:
-  #   needs: [build-server, build-client]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Make API request to Watchtower to refresh images on VPS
-  #       run: |
-  #         curl --request GET \
-  #         --url https://watchtower.tobijes.com/v1/update \
-  #         --header 'authorization: Bearer ${{ secrets.WATCHTOWER_TOKEN }}'
+  deploy-production:
+    needs: [build-app]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Make API request to Watchtower to refresh images on VPS
+        run: |
+          curl --request GET \
+          --url https://watchtower.tobijes.com/v1/update \
+          --header 'authorization: Bearer ${{ secrets.WATCHTOWER_TOKEN }}'
