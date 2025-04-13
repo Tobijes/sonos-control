@@ -66,8 +66,8 @@ void loop() {
   // Check button press and release
   checkButtonPressAndRelease();
   
-  // Quick blink LED if WiFi is connected
-  if (wifiConnected) {
+  // Quick blink LED if WiFi is not connected
+  if (!wifiConnected) {
     digitalWrite(STATUS_LED, millis() % 1000 < 50 ? HIGH : LOW);
   }
 }
@@ -121,6 +121,7 @@ void connectToWifi() {
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
     wifiConnected = true;
+    digitalWrite(STATUS_LED, LOW);
   } else {
     Serial.println("\nFailed to connect to WiFi");
     wifiConnected = false;
@@ -207,7 +208,7 @@ void checkButtonPressAndRelease() {
   if (button1State == HIGH && button1Pressed) { // Button is released
     if (millis() - pressStartTime1 >= MIN_PRESS_TIME) {
       Serial.println("Button 1 pressed");
-      makeApiCall("/endpoint1");
+      makeApiCall("/play");
     }
     button1Pressed = false;
   }
@@ -222,7 +223,7 @@ void checkButtonPressAndRelease() {
   if (button2State == HIGH && button2Pressed) { // Button is released
     if (millis() - pressStartTime2 >= MIN_PRESS_TIME) {
       Serial.println("Button 2 pressed");
-      makeApiCall("/endpoint2");
+      makeApiCall("/pause");
     }
     button2Pressed = false;
   }
