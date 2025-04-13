@@ -16,6 +16,13 @@ class Group:
     id: str
     name: str
     playback_state: str
+    player_ids: list[str]
+
+@dataclass
+class Favorite:
+    favorite_id: str
+    name: str
+    description: str    
 
 class APIHandledError(Exception):
     status_code: int 

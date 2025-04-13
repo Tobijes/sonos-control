@@ -56,10 +56,13 @@ async def check_authentication(request: Request, call_next):
 async def root():
     household_id = sonos_control.get_household_id()
     groups = sonos_control.get_groups()
+    favorites = sonos_control.get_favorites()
+
     return {
         "message": "Welcome to the Sonos API Service", 
         "household_id":household_id, 
-        "groups": groups
+        "groups": groups,
+        "favorites": favorites 
     }
 
 @app.get("/login", summary="Endpoint for authenticating with Sonos account", tags=["Auth"])
@@ -79,7 +82,7 @@ async def callback(request: Request):
 
     return RedirectResponse("/")
 
-@app.get("/play", summary="Endpoint for triggering Play action: Group all speakers, set volume to 15%, start radio", tags=["Speakers"])
+@app.get("/play", summary="Endpoint for triggering Play action: Group all speakers, set volume to 15%, start playback", tags=["Speakers"])
 async def play():
     sonos_control.group_play()
 

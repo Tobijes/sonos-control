@@ -1,9 +1,11 @@
 services:
   app:
     image: sonos
+    build: ./
     ports:
       - 8000:80
-    environment:
-      REDIRECT_URI:
-      CLIENT_ID:
-      CLIENT_SECRET:
+    env_file:
+      - .env
+    volumes:
+      - ./data/:/app/data
+    

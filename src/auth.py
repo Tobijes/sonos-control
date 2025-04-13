@@ -18,7 +18,7 @@ from src.models import  NotAuthorizedError, OAuthStateMismatchError
 ACCESS_URL = "https://api.sonos.com/login/v3/oauth/access"
 
 # Save paths
-AUTHORIZATION_FILE = Path("authorization.json")
+AUTHORIZATION_FILE = Path("data/authorization.json")
 
 # Get environment variables
 CLIENT_ID = os.getenv("CLIENT_ID")
@@ -31,6 +31,7 @@ class SonosAuth():
     last_oath_link_state: str = None
 
     def __init__(self):
+        AUTHORIZATION_FILE.parent.mkdir(parents=True, exist_ok=True)
         self.load_authorization()
 
     def get_credentials_headers(self):
