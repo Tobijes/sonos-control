@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 import httpx
 
@@ -6,6 +8,9 @@ from src.models import Group
 
 # SONOS API URLs
 CONTROL_URL_BASE = "https://api.ws.sonos.com/control/api/v1/"
+
+ALLOW_WRITE = bool(os.getenv("ALLOW_WRITE", False))
+print("Allow write to Sonos", ALLOW_WRITE)
 
 class SonosControl:
     sonos_auth: SonosAuth
@@ -53,6 +58,8 @@ class SonosControl:
         groups: list[Group] = self.get_groups()
 
         for group in groups:
+            if not ALLOW_WRITE:
+                continue
             response = httpx.post(f"{CONTROL_URL_BASE}/groups/{group.id}/playback/play", headers=headers)
             
             if response.status_code != 200:
@@ -64,6 +71,8 @@ class SonosControl:
         groups: list[Group] = self.get_groups()
 
         for group in groups:
+            if not ALLOW_WRITE:
+                continue
             response = httpx.post(f"{CONTROL_URL_BASE}/groups/{group.id}/playback/pause", headers=headers)
             
             if response.status_code != 200:
