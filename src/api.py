@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
-from src.models import Group, NotAuthorizedError, OAuthStateMismatchError
+from src.models import APIHandledError
 from src.auth import SonosAuth
 from src.control import SonosControl
 
@@ -91,16 +91,6 @@ async def pause():
 
     return "Ok"
 
-@app.exception_handler(NotAuthorizedError)
-async def not_authorized_handler(request: Request, exc: NotAuthorizedError):
-    return JSONResponse(
-        status_code=401,
-        content={"message": f"Missing authorization, go to /login"},
-    )
-
-@app.exception_handler(OAuthStateMismatchError)
-async def oauth_state_mismatch_handler(request: Request, exc: OAuthStateMismatchError):
-    return JSONResponse(
-        status_code=401,
-        content={"message": f"The state returned from the OAuth process did not match source state"},
-    )
+@app.exception_handler(APIHandledError)
+async def not_authorized_handler(request: Request, exc: APIHandledError):
+    return JSONResponse(status_code=exc.status_code, content={"message": exc.message})

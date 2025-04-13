@@ -17,11 +17,17 @@ class Group:
     name: str
     playback_state: str
 
-class NotAuthorizedError(Exception):
-    pass
+class APIHandledError(Exception):
+    status_code: int 
+    message: str
 
-class OAuthStateMismatchError(Exception):
-    pass
+class NotAuthorizedError(APIHandledError):
+    status_code = 401
+    message = "Missing authorization, go to /login"
+
+class OAuthStateMismatchError(APIHandledError):
+    status_code = 403
+    message = "The state returned from the OAuth process did not match source state"
 
 class DateTimeEncoder(json.JSONEncoder):
     def default(self, o):
