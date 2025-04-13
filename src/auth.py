@@ -120,6 +120,7 @@ class SonosAuth():
         print(token_response.text, flush=True)
         token_json = token_response.json()
         self.authorization = Authorization(**token_json)
+        self.save_authorization()
 
 
     async def task_refresh_authorization(self):
