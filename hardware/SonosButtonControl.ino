@@ -5,14 +5,11 @@
 
 // Button pins
 const int BUTTON1_PIN = 12;
-const int BUTTON2_PIN = 14;
 
 // Button state tracking variables
 unsigned long pressStartTime1 = 0;
-unsigned long pressStartTime2 = 0;
 const unsigned long MIN_PRESS_TIME = 50; // Minimum time in ms for a valid press
 bool button1Pressed = false;
-bool button2Pressed = false;
 
 // LED pin for status indication
 const int STATUS_LED = 2;
@@ -33,7 +30,6 @@ void setup() {
   
   // Initialize button pins as input with pull-up resistors
   pinMode(BUTTON1_PIN, INPUT_PULLUP);
-  pinMode(BUTTON2_PIN, INPUT_PULLUP);
   
   // Initialize LED pin
   pinMode(STATUS_LED, OUTPUT);
@@ -196,7 +192,6 @@ void resetConfig() {
 void checkButtonPressAndRelease() {
   // Read the current button states
   int button1State = digitalRead(BUTTON1_PIN);
-  int button2State = digitalRead(BUTTON2_PIN);
   
   // Check button 1 for press
   if (button1State == LOW && !button1Pressed) { // Button is pressed (LOW due to pull-up)
@@ -208,25 +203,11 @@ void checkButtonPressAndRelease() {
   if (button1State == HIGH && button1Pressed) { // Button is released
     if (millis() - pressStartTime1 >= MIN_PRESS_TIME) {
       Serial.println("Button 1 pressed");
-      makeApiCall("/play");
+      makeApiCall("/toggle");
     }
     button1Pressed = false;
   }
-  
-  // Check button 2 for press
-  if (button2State == LOW && !button2Pressed) { // Button is pressed (LOW due to pull-up)
-    pressStartTime2 = millis();
-    button2Pressed = true;
-  }
-  
-  // Check button 2 for release after minimum press time
-  if (button2State == HIGH && button2Pressed) { // Button is released
-    if (millis() - pressStartTime2 >= MIN_PRESS_TIME) {
-      Serial.println("Button 2 pressed");
-      makeApiCall("/pause");
-    }
-    button2Pressed = false;
-  }
+
 }
 
 void makeApiCall(String endpoint) {
