@@ -84,14 +84,17 @@ async def callback(request: Request):
 
 @app.get("/play", summary="Endpoint for triggering Play action: Group all speakers, set volume to 15%, start playback", tags=["Speakers"])
 async def play():
-    sonos_control.group_play()
-
+    sonos_control.play_all_groups()
     return "Ok"
 
 @app.get("/pause", summary="Endpoint for triggering Pause action: Pause each group", tags=["Speakers"])
 async def pause():
-    sonos_control.group_pause()
+    sonos_control.pause_all_groups()
+    return "Ok"
 
+@app.get("/toggle", summary="Endpoint for triggering play or pause depending on state", tags=["Speakers"])
+async def toggle():
+    sonos_control.group_toggle()
     return "Ok"
 
 @app.exception_handler(APIHandledError)
