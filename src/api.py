@@ -7,8 +7,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+from httpx import AsyncClient
 
-from src.models import APIHandledError
+from src.models import APIHandledError, NotAuthorizedError
 from src.auth import SonosAuth
 from src.control import SonosControl
 
@@ -17,15 +18,21 @@ async def lifespan(app: FastAPI):
     # Create tasks
     loop = asyncio.get_running_loop()
     loop.create_task(sonos_auth.task_refresh_authorization())
+    try:
+        await sonos_control.get_household_id()
+    except NotAuthorizedError:
+        pass
+    
     yield
     # Run cleanup
-    # ...
+    await client.aclose()
 
 load_dotenv()
 SERVICE_PASSWORD = os.getenv("SERVICE_PASSWORD")
 
+client = AsyncClient()
 sonos_auth = SonosAuth()
-sonos_control = SonosControl(sonos_auth)
+sonos_control = SonosControl(sonos_auth, client)
 app = FastAPI(lifespan=lifespan)
 
 def check_permission(method, path, auth):
@@ -54,9 +61,11 @@ async def check_authentication(request: Request, call_next):
 
 @app.get("/", tags=["Speakers"])
 async def root():
-    household_id = sonos_control.get_household_id()
-    groups = sonos_control.get_groups()
-    favorites = sonos_control.get_favorites()
+    household_id, groups, favorites = await asyncio.gather(
+        sonos_control.get_household_id(),
+        sonos_control.get_groups(),
+        sonos_control.get_favorites()
+    )
 
     return {
         "message": "Welcome to the Sonos API Service", 
@@ -84,17 +93,17 @@ async def callback(request: Request):
 
 @app.get("/play", summary="Endpoint for triggering Play action: Group all speakers, set volume to 15%, start playback", tags=["Speakers"])
 async def play():
-    sonos_control.play_all_groups()
+    await sonos_control.play_all_groups()
     return "Ok"
 
 @app.get("/pause", summary="Endpoint for triggering Pause action: Pause each group", tags=["Speakers"])
 async def pause():
-    sonos_control.pause_all_groups()
+    await sonos_control.pause_all_groups()
     return "Ok"
 
 @app.get("/toggle", summary="Endpoint for triggering play or pause depending on state", tags=["Speakers"])
 async def toggle():
-    sonos_control.group_toggle()
+    await sonos_control.group_toggle()
     return "Ok"
 
 @app.exception_handler(APIHandledError)
