@@ -1,5 +1,6 @@
 import asyncio
 import os
+import json
 from datetime import timedelta
 import math
 
@@ -83,6 +84,13 @@ class SonosControl:
         groups = [Group(id=g["id"], name=g["name"], playback_state=g["playbackState"], player_ids=g["playerIds"]) for g in groups]
 
         return groups
+
+    async def get_playback_metadata(self, group: Group):   
+        """Get the Group's metadata and playback state"""
+        data = await self.get(url=f"{CONTROL_URL_BASE}/groups/{group.id}/playbackMetadata")
+
+        print(json.dumps(data, indent=4))
+
     
     async def get_favorites(self) -> list: 
         """Get the Favorites"""  
