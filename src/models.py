@@ -17,6 +17,7 @@ class Group:
     name: str
     playback_state: str
     player_ids: list[str]
+    playback_type: str = None
 
 @dataclass
 class Favorite:

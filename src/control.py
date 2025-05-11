@@ -19,6 +19,10 @@ print("Allow write to Sonos", ALLOW_WRITE, flush=True)
 STATE_PLAYING = "PLAYBACK_STATE_PLAYING"
 STATE_IDLE= "PLAYBACK_STATE_IDLE"
 
+PLAYBACK_STATE_HDMI = "linein.homeTheater.hdmi"
+PLAYBACK_STATE_STATION = "station"
+PLAYBACK_STATE_SPOTIFY = ""
+
 def millis(delta: timedelta):
     return math.ceil(delta.microseconds/1000)
 
@@ -31,26 +35,44 @@ class SonosControl:
         self.sonos_auth = sonos_auth
         self.client = client
 
-    async def get(self, url: str, params=None):
+    async def get(self, url: str, params=None, tries=3):
         """ Standardized GET REST call"""
         headers = self.sonos_auth.get_authorized_headers()
-        response = await self.client.get(url, headers=headers, params=params)
-        print(f"GET {millis(response.elapsed)}ms {url=}", flush=True)
+        for i in range(tries):
+            try:
+                response = await self.client.get(url, headers=headers, params=params)
+                print(f"GET {millis(response.elapsed)}ms {url=}", flush=True)
+                break
+            except httpx.ConnectTimeout as exc:
+                print(f"GET {url=} failed. Retrying...", flush=True)
+                if i == tries-1: # No more tries
+                    raise Exception(f"GET {url=} Exceeded retries") from exc
+                await asyncio.sleep((i+1)*50)
+                
         if response.status_code != 200:
             raise Exception(f"Got {response.status_code=} with error: {response.text}\n {url=} {params=}")
         
         return response.json()    
     
-    async def post(self, url: str, json=None):
+    async def post(self, url: str, json=None, tries=3):
         """ Standardized POST REST call"""
         # Check if allowed to change real settings
         if not ALLOW_WRITE:
             return
         
         headers = self.sonos_auth.get_authorized_headers()
-        response = await self.client.post(url, headers=headers, json=json)
-        print(f"POST {millis(response.elapsed)}ms {url=}", flush=True)
-        
+
+        for i in range(tries):
+            try:
+                response = await self.client.post(url, headers=headers, json=json)
+                print(f"POST {millis(response.elapsed)}ms {url=}", flush=True)
+                break
+            except httpx.ConnectTimeout as exc:
+                print(f"POST {url=} failed. Retrying...", flush=True)
+                if i == tries-1: # No more tries
+                    raise Exception(f"GET {url=} Exceeded retries") from exc
+                await asyncio.sleep((i+1)*50)
+
         if response.status_code != 200:
             raise Exception(f"Got {response.status_code=} with error: {response.text}\n {url=} {json=}")
         
@@ -83,13 +105,17 @@ class SonosControl:
         
         groups = [Group(id=g["id"], name=g["name"], playback_state=g["playbackState"], player_ids=g["playerIds"]) for g in groups]
 
+        for group in groups:
+            if group.playback_state == STATE_PLAYING:
+                data = await self.get_playback_metadata(group)
+                group.playback_type = data["container"]["type"]
+
         return groups
 
-    async def get_playback_metadata(self, group: Group):   
+    async def get_playback_metadata(self, group: Group) -> dict:   
         """Get the Group's metadata and playback state"""
         data = await self.get(url=f"{CONTROL_URL_BASE}/groups/{group.id}/playbackMetadata")
-
-        print(json.dumps(data, indent=4))
+        return data
 
     
     async def get_favorites(self) -> list: 
@@ -108,11 +134,11 @@ class SonosControl:
     async def group_toggle(self):
         """Toggles between playing and pausing based on previous state"""
         groups = await self.get_groups()
-    
-        if any(group.playback_state == STATE_PLAYING for group in groups):
-            await self.pause_all_groups(groups)
-        else:
+
+        if all(group.playback_state == STATE_IDLE or (group.playback_state == STATE_PLAYING and group.playback_type == PLAYBACK_STATE_HDMI) for group in groups):
             await self.play_all_groups(groups)
+        else:
+            await self.pause_all_groups(groups)
 
     async def play_all_groups(self, groups=None):
         """Runs *Play Procedure*: Group all speakers, set volume to 15%, start playback"""
@@ -127,7 +153,7 @@ class SonosControl:
             *[self.set_player_volume(player_id=player_id, volume=15) for player_id in player_ids],
             self.create_group(player_ids=player_ids),
         )
-        print(group, flush=True)
+        print("Created group:", group, flush=True)
 
         # Load first favorite onto the group with playback if possible, otherwise just play
         favorites = await favorites_coroutine
@@ -158,12 +184,18 @@ class SonosControl:
 
     async def pause_group(self, group: Group):
         """Pause a single group"""
+        # Check that we don't command pause on a HDMI playing session
+        if group.playback_type == PLAYBACK_STATE_HDMI:
+            return 
         await self.post(
             url=f"{CONTROL_URL_BASE}/groups/{group.id}/playback/pause"
         )
 
     async def play_group(self, group: Group):
         """Play a single group"""
+        # Check that we don't command play on a HDMI playing session
+        if group.playback_type == PLAYBACK_STATE_HDMI:
+            return 
         await self.post(
             url=f"{CONTROL_URL_BASE}/groups/{group.id}/playback/play"
         )

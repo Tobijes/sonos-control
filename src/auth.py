@@ -104,9 +104,7 @@ class SonosAuth():
         print("Authorization loaded from file", flush=True)
         self.authorization = Authorization(**json_dict)
         
-        if self.authorization.last_refreshed + timedelta(seconds=self.authorization.expires_in) < datetime.now():
-            print("Authorization loaded, but invalid")
-            self.refresh_token()
+        self.refresh_token()
 
 
     def refresh_token(self):
