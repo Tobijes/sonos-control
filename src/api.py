@@ -87,7 +87,7 @@ async def callback(request: Request):
 
     sonos_auth.get_access_token(authorization_code, state)
 
-    sonos_control.get_household_id()
+    await sonos_control.get_household_id()
 
     return RedirectResponse("/")
 
