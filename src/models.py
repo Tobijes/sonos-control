@@ -1,15 +1,42 @@
 import json
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta, timezone
 
 @dataclass
 class Authorization:
     access_token: str
     refresh_token: str
-    expires_in: int
+    expires_at: datetime
     token_type: str
     scope: str
-    last_refreshed: datetime = datetime.now()
+
+    @classmethod
+    def from_api(cls, data: dict) -> 'Authorization':
+        expires_in = int(data.get("expires_in"))
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        return cls(
+            access_token=data.get('access_token'),
+            refresh_token=data.get('refresh_token'),
+            token_type=data.get('token_type'),
+            scope=data.get("scope"),
+            expires_at=expires_at
+        )
+    
+    @classmethod
+    def from_file(cls: 'Authorization', data: dict) -> 'Authorization':
+        expires_at = datetime.fromisoformat(data.get("expires_at"))
+        return cls(
+            access_token=data.get('access_token'),
+            refresh_token=data.get('refresh_token'),
+            token_type=data.get('token_type'),
+            scope=data.get("scope"),
+            expires_at=expires_at
+        )
+
+
+    def to_json_str(self) -> str:
+        json_str = json.dumps(asdict(self), cls=DateTimeEncoder)
+        return json_str
 
 @dataclass
 class Group:
