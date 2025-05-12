@@ -1,8 +1,8 @@
 import asyncio
 import os
-import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 import math
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -141,15 +141,19 @@ class SonosControl:
             await self.pause_all_groups(groups)
 
     async def play_all_groups(self, groups=None):
-        """Runs *Play Procedure*: Group all speakers, set volume to 15%, start playback"""
+        """Runs *Play Procedure*: Group all speakers, set volume to 15% or 20% based on hour, start playback"""
         favorites_coroutine = self.get_favorites()
         if groups is None:
             groups = await self.get_groups()
 
+        # Determine volume level based on time
+        now = datetime.now(ZoneInfo("Europe/Copenhagen"))
+        volume = 20 if now.hour >= 8 and now.hour < 22 else 15
 
-        # Set all players volume to standard level. Kick off REST calls and await later
+        # Set all players volume to standard level. Kick off REST calls and await later    
         player_ids = [player_id for group in groups for player_id in group.player_ids]
-        set_player_volume_coroutines = [self.set_player_volume(player_id=player_id, volume=15) for player_id in player_ids]
+        print(f"Setting players volume to {volume}", flush=True)
+        set_player_volume_coroutines = [self.set_player_volume(player_id=player_id, volume=volume) for player_id in player_ids]
 
         # Gather all players in a single group. If already a single group, just reuse.
         if len(groups) > 1:
