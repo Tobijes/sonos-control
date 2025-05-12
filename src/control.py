@@ -147,13 +147,20 @@ class SonosControl:
             groups = await self.get_groups()
 
 
-        # Set all players volume to standard level and create a single group of the players
+        # Set all players volume to standard level. Kick off REST calls and await later
         player_ids = [player_id for group in groups for player_id in group.player_ids]
-        *_, group = await asyncio.gather(
-            *[self.set_player_volume(player_id=player_id, volume=15) for player_id in player_ids],
-            self.create_group(player_ids=player_ids),
-        )
-        print("Created group:", group, flush=True)
+        set_player_volume_coroutines = [self.set_player_volume(player_id=player_id, volume=15) for player_id in player_ids]
+
+        # Gather all players in a single group. If already a single group, just reuse.
+        if len(groups) > 1:
+            group = await self.create_group(player_ids=player_ids)
+            print("Created group:", group, flush=True)
+        else:
+            group = groups[0]
+            print("Reusing group:", group, flush=True)
+        
+        # Await all volumes to be set (call started off earlier)
+        await asyncio.gather(*set_player_volume_coroutines)
 
         # Load first favorite onto the group with playback if possible, otherwise just play
         favorites = await favorites_coroutine
