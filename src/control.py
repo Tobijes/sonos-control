@@ -18,6 +18,7 @@ print("Allow write to Sonos", ALLOW_WRITE, flush=True)
 # SONOS CONSTANTS
 STATE_PLAYING = "PLAYBACK_STATE_PLAYING"
 STATE_IDLE= "PLAYBACK_STATE_IDLE"
+STATE_PAUSED = "PLAYBACK_STATE_PAUSED"
 
 PLAYBACK_STATE_HDMI = "linein.homeTheater.hdmi"
 PLAYBACK_STATE_STATION = "station"
@@ -135,7 +136,7 @@ class SonosControl:
         """Toggles between playing and pausing based on previous state"""
         groups = await self.get_groups()
 
-        if all(group.playback_state == STATE_IDLE or (group.playback_state == STATE_PLAYING and group.playback_type == PLAYBACK_STATE_HDMI) for group in groups):
+        if all(group.playback_state in [STATE_IDLE, STATE_PAUSED] or (group.playback_state == STATE_PLAYING and group.playback_type == PLAYBACK_STATE_HDMI) for group in groups):
             await self.play_all_groups(groups)
         else:
             await self.pause_all_groups(groups)
