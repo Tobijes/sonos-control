@@ -124,11 +124,10 @@ class SonosAuth():
                 continue
 
             
-            refresh_time = self.authorization.expires_at + timedelta( hours=-1)
-            now =  datetime.now(timezone.utc)
+            refresh_time = self.authorization.expires_at + timedelta(hours=-1)
+            now = datetime.now(timezone.utc)
             sleep_time = refresh_time - now
             print(f"Now is {now}, refreshing at {refresh_time}. Sleeping for {sleep_time.seconds} seconds", flush=True)
             await asyncio.sleep(sleep_time.seconds)
-
-            self.authorization = self.refresh_token()
+            self.refresh_token()
 
