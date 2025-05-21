@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import dataclass
 import os
 from datetime import datetime, timedelta
 import math
@@ -26,6 +27,13 @@ PLAYBACK_STATE_SPOTIFY = ""
 
 def millis(delta: timedelta):
     return math.ceil(delta.microseconds/1000)
+
+@dataclass
+class SubscriptionState:
+    groups: list[Group] = None
+    favorites: list[Favorite] = None
+    household_id: str = None
+    last_update: datetime = None
 
 class SonosControl:
     sonos_auth: SonosAuth
@@ -250,3 +258,21 @@ class SonosControl:
                 "playOnCompletion": True
             }
         )
+
+    async def init_subscriptions(self):
+        """Initialize the subscriptions"""
+        # Get the household ID
+        household_id = await self.get_household_id()
+
+        # Subscribe to the groups and favorites. Individual group subscriptions are subscribed to when received
+        await self.post(url=f"{CONTROL_URL_BASE}/households/{household_id}/groups/subscription")
+        await self.post(url=f"{CONTROL_URL_BASE}/households/{household_id}/favorites/subscription")
+        
+    async def deinit_subscriptions(self):
+        """Deinitialize the subscriptions"""
+        # Get the household ID
+        household_id = await self.get_household_id()
+
+        # Unsubscribe to the groups and favorites. Individual group subscriptions are unsubscribed to when received
+        await self.delete(url=f"{CONTROL_URL_BASE}/households/{household_id}/groups/subscription")
+        await self.delete(url=f"{CONTROL_URL_BASE}/households/{household_id}/favorites/subscription")

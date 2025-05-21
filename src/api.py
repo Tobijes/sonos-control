@@ -3,7 +3,7 @@ import asyncio
 from typing import Annotated
 import base64
 
-from fastapi import FastAPI, Request
+from fastapi import Body, FastAPI, Header, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -20,11 +20,16 @@ async def lifespan(app: FastAPI):
     loop.create_task(sonos_auth.task_refresh_authorization())
     try:
         await sonos_control.get_household_id()
+        await sonos_control.init_subscriptions()
     except NotAuthorizedError:
         print("Not authorized, please login", flush=True)
     
     yield
     # Run cleanup
+    try:
+        await sonos_control.deinit_subscriptions()
+    except NotAuthorizedError:
+        print("Not authorized", flush=True)
     await client.aclose()
 
 load_dotenv()
@@ -38,6 +43,9 @@ app = FastAPI(lifespan=lifespan)
 def check_permission(method, path, auth):
     # The following paths are always allowed:
     if method == 'GET' and path in ['/', '/docs', '/openapi.json', '/favicon.ico']:
+        return True
+    
+    if method == 'POST' and path in ['/events']:
         return True
     
     # Parse auth header and check scheme, username and password
@@ -90,6 +98,24 @@ async def callback(request: Request):
     await sonos_control.get_household_id()
 
     return RedirectResponse("/")
+
+@app.post("/events", summary="Endpoint for events from the Sonos API based on subscriptions", tags=["Subscription"])
+async def events(
+    x_sonos_household_id: Annotated[str | None, Header()] = None,
+    x_sonos_event_seq_id: Annotated[str | None, Header()] = None,
+    x_sonos_event_signature: Annotated[str | None, Header()] = None,
+    x_sonos_namespace: Annotated[str | None, Header()] = None,
+    x_sonos_type: Annotated[str | None, Header()] = None,
+    x_sonos_target_type: Annotated[str | None, Header()] = None,
+    x_sonos_target_value: Annotated[str | None, Header()] = None,
+    data: Annotated[dict | None, Body()] = None
+    ):
+    # This endpoint is used to receive events from the Sonos API
+    # It should be called by the Sonos API when an event occurs
+    # The event data will be processed and stored in the subscription state
+    print(f"Event received: {x_sonos_household_id=} {x_sonos_event_seq_id=} {x_sonos_event_signature=} {x_sonos_namespace=} {x_sonos_type=} {x_sonos_target_type=} {x_sonos_target_value=}", flush=True)
+    
+    return JSONResponse(status_code=200, content={"message": "Event received"})
 
 @app.get("/play", summary="Endpoint for triggering Play action: Group all speakers, set volume to 15%, start playback", tags=["Speakers"])
 async def play():
