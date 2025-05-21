@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
     try:
         await sonos_control.get_household_id()
     except NotAuthorizedError:
-        pass
+        print("Not authorized, please login", flush=True)
     
     yield
     # Run cleanup

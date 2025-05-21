@@ -37,7 +37,7 @@ class SonosControl:
         self.client = client
 
     async def get(self, url: str, params=None, tries=3):
-        """ Standardized GET REST call"""
+        """ Standardized GET REST call """
         headers = self.sonos_auth.get_authorized_headers()
         for i in range(tries):
             try:
@@ -48,7 +48,7 @@ class SonosControl:
                 print(f"GET {url=} failed. Retrying...", flush=True)
                 if i == tries-1: # No more tries
                     raise Exception(f"GET {url=} Exceeded retries") from exc
-                await asyncio.sleep((i+1)*50)
+                await asyncio.sleep((i+1)*(50/1000)) # Specify milliseconds
                 
         if response.status_code != 200:
             raise Exception(f"Got {response.status_code=} with error: {response.text}\n {url=} {params=}")
@@ -56,11 +56,7 @@ class SonosControl:
         return response.json()    
     
     async def post(self, url: str, json=None, tries=3):
-        """ Standardized POST REST call"""
-        # Check if allowed to change real settings
-        if not ALLOW_WRITE:
-            return
-        
+        """ Standardized POST REST call """
         headers = self.sonos_auth.get_authorized_headers()
 
         for i in range(tries):
@@ -71,11 +67,31 @@ class SonosControl:
             except httpx.ConnectTimeout as exc:
                 print(f"POST {url=} failed. Retrying...", flush=True)
                 if i == tries-1: # No more tries
-                    raise Exception(f"GET {url=} Exceeded retries") from exc
-                await asyncio.sleep((i+1)*50)
+                    raise Exception(f"POST {url=} Exceeded retries") from exc
+                await asyncio.sleep((i+1)*(50/1000))
 
         if response.status_code != 200:
             raise Exception(f"Got {response.status_code=} with error: {response.text}\n {url=} {json=}")
+        
+        return response.json()
+    
+    async def delete(self, url: str, params=None, tries=3):
+        """ Standardized DELETE REST call """
+        headers = self.sonos_auth.get_authorized_headers()
+
+        for i in range(tries):
+            try:
+                response = await self.client.delete(url, headers=headers, params=params)
+                print(f"DELETE {millis(response.elapsed)}ms {url=}", flush=True)
+                break
+            except httpx.ConnectTimeout as exc:
+                print(f"DELETE {url=} failed. Retrying...", flush=True)
+                if i == tries-1: # No more tries
+                    raise Exception(f"DELETE {url=} Exceeded retries") from exc
+                await asyncio.sleep((i+1)*(50/1000))
+
+        if response.status_code != 200:
+            raise Exception(f"Got {response.status_code=} with error: {response.text}\n {url=} {params=}")
         
         return response.json()
 
@@ -143,6 +159,9 @@ class SonosControl:
 
     async def play_all_groups(self, groups=None):
         """Runs *Play Procedure*: Group all speakers, set volume to 15% or 20% based on hour, start playback"""
+        # Check if allowed to change real settings
+        if not ALLOW_WRITE:
+            return
         favorites_coroutine = self.get_favorites()
         if groups is None:
             groups = await self.get_groups()
@@ -179,6 +198,9 @@ class SonosControl:
         
     async def pause_all_groups(self, groups=None):
         """Pauses all groups"""
+        # Check if allowed to change real settings
+        if not ALLOW_WRITE:
+            return
         if groups is None:
             groups = await self.get_groups()
         await asyncio.gather(*[self.pause_group(group) for group in groups if group.playback_state == STATE_PLAYING])
