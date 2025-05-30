@@ -4,7 +4,7 @@
 #include <WiFiClientSecure.h>
 
 // Button pins
-const int BUTTON1_PIN = 12;
+const int BUTTON1_PIN = 5;
 
 // Button state tracking variables
 unsigned long pressStartTime1 = 0;
