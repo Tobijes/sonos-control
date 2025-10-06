@@ -15,3 +15,37 @@ The hardware client is an ESP32 device that is powered from the wall with button
 - WiFi credentials
 - Base url for the API
 - The required password for the API 
+
+
+# Setup
+## Environment variables
+Create an `.env` file from the `.env.template` and fill out the details. Then run 
+```
+set -a; source .env; set +a
+```
+
+## Python
+If on an new Ubuntu machine. Install virtual environments
+```
+sudo apt install python3.12-venv
+```
+
+Create a Python virtual environment, initialize and install dependencies
+```
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements
+```
+
+Run the application from root folder using 
+```
+uvicorn src.api:app
+```
+
+## `ngrok`
+Install `ngrok` agent.
+
+Then open connection using
+```
+ngrok http --url=<DOMAIN> 8000
+```
