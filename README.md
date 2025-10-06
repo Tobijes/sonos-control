@@ -19,10 +19,7 @@ The hardware client is an ESP32 device that is powered from the wall with button
 
 # Setup
 ## Environment variables
-Create an `.env` file from the `.env.template` and fill out the details. Then run 
-```
-set -a; source .env; set +a
-```
+Create an `.env` file from the `.env.template` and fill out the details. 
 
 ## Python
 If on an new Ubuntu machine. Install virtual environments
