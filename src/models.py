@@ -1,6 +1,7 @@
 import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
+import src.constants as c
 
 @dataclass
 class Authorization:
@@ -45,6 +46,20 @@ class Group:
     playback_state: str
     player_ids: list[str]
     playback_type: str = None
+
+    @property
+    def playable(self) -> bool:
+        return self.controllable and self.playback_state in [c.STATE_IDLE, c.STATE_PAUSED] 
+    
+    @property
+    def pausable(self) -> bool:
+        return self.controllable and self.playback_state in [c.STATE_PLAYING] 
+    
+    @property
+    def controllable(self) -> bool:
+        return self.playback_type != c.PLAYBACK_STATE_HDMI
+    
+
 
 @dataclass
 class Favorite:

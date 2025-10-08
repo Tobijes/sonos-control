@@ -6,7 +6,6 @@ import base64
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from contextlib import asynccontextmanager
-from dotenv import load_dotenv
 from httpx import AsyncClient
 
 from src.models import APIHandledError, NotAuthorizedError
@@ -27,7 +26,6 @@ async def lifespan(app: FastAPI):
     # Run cleanup
     await client.aclose()
 
-load_dotenv()
 SERVICE_PASSWORD = os.getenv("SERVICE_PASSWORD")
 
 client = AsyncClient()
@@ -91,7 +89,12 @@ async def callback(request: Request):
 
     return RedirectResponse("/")
 
-@app.get("/play", summary="Endpoint for triggering Play action: Group all speakers, set volume to 15%, start playback", tags=["Speakers"])
+@app.get("/groupplay", summary="Endpoint for triggering Group & Play action: Group all speakers, set volume to 15%, start playback", tags=["Speakers"])
+async def play():
+    await sonos_control.group_and_play_all_groups()
+    return "Ok"
+
+@app.get("/play", summary="Endpoint for triggering  Play action: Start playback on each group", tags=["Speakers"])
 async def play():
     await sonos_control.play_all_groups()
     return "Ok"

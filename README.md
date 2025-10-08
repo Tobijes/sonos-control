@@ -36,7 +36,7 @@ pip install -r requirements
 
 Run the application from root folder using 
 ```
-uvicorn src.api:app
+uvicorn src.api:app --env-file .env
 ```
 
 ## `ngrok`

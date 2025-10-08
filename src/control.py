@@ -8,21 +8,13 @@ import httpx
 
 from src.auth import SonosAuth
 from src.models import Group, Favorite
+from src.constants import STATE_PLAYING
 
 # SONOS API URLs
 CONTROL_URL_BASE = "https://api.ws.sonos.com/control/api/v1"
 
 ALLOW_WRITE = bool(os.getenv("ALLOW_WRITE", False))
 print("Allow write to Sonos", ALLOW_WRITE, flush=True)
-
-# SONOS CONSTANTS
-STATE_PLAYING = "PLAYBACK_STATE_PLAYING"
-STATE_IDLE= "PLAYBACK_STATE_IDLE"
-STATE_PAUSED = "PLAYBACK_STATE_PAUSED"
-
-PLAYBACK_STATE_HDMI = "linein.homeTheater.hdmi"
-PLAYBACK_STATE_STATION = "station"
-PLAYBACK_STATE_SPOTIFY = ""
 
 def millis(delta: timedelta):
     return math.ceil(delta.microseconds/1000)
@@ -31,6 +23,9 @@ class SonosControl:
     sonos_auth: SonosAuth
     client: httpx.AsyncClient
     household_id: str = None
+
+    # States (without persistence across restarts)
+    last_toggled: datetime = None
 
     def __init__(self, sonos_auth, client):
         self.sonos_auth = sonos_auth
@@ -152,12 +147,17 @@ class SonosControl:
         """Toggles between playing and pausing based on previous state"""
         groups = await self.get_groups()
 
-        if all(group.playback_state in [STATE_IDLE, STATE_PAUSED] or (group.playback_state == STATE_PLAYING and group.playback_type == PLAYBACK_STATE_HDMI) for group in groups):
-            await self.play_all_groups(groups)
+        if all(group.playable or not group.controllable for group in groups):
+            if self.last_toggled is None or (datetime.now() - self.last_toggled) > timedelta(hours=1):
+                await self.group_and_play_all_groups(groups)
+            else:
+                await self.play_all_groups()
         else:
             await self.pause_all_groups(groups)
 
-    async def play_all_groups(self, groups=None):
+        self.last_toggled = datetime.now()
+
+    async def group_and_play_all_groups(self, groups=None):
         """Runs *Play Procedure*: Group all speakers, set volume to 15% or 20% based on hour, start playback"""
         # Check if allowed to change real settings
         if not ALLOW_WRITE:
@@ -203,7 +203,16 @@ class SonosControl:
             return
         if groups is None:
             groups = await self.get_groups()
-        await asyncio.gather(*[self.pause_group(group) for group in groups if group.playback_state == STATE_PLAYING])
+        await asyncio.gather(*[self.pause_group(group) for group in groups])
+
+    async def play_all_groups(self, groups=None):
+        """Plays all groups (without changing configuration)"""
+        # Check if allowed to change real settings
+        if not ALLOW_WRITE:
+            return
+        if groups is None:
+            groups = await self.get_groups()
+        await asyncio.gather(*[self.play_group(group) for group in groups])
 
     async def create_group(self, player_ids: list[str]):
         """Groups the **player_ids** into a single group"""
@@ -219,7 +228,7 @@ class SonosControl:
     async def pause_group(self, group: Group):
         """Pause a single group"""
         # Check that we don't command pause on a HDMI playing session
-        if group.playback_type == PLAYBACK_STATE_HDMI:
+        if not group.pausable:
             return 
         await self.post(
             url=f"{CONTROL_URL_BASE}/groups/{group.id}/playback/pause"
@@ -228,7 +237,7 @@ class SonosControl:
     async def play_group(self, group: Group):
         """Play a single group"""
         # Check that we don't command play on a HDMI playing session
-        if group.playback_type == PLAYBACK_STATE_HDMI:
+        if not group.playable:
             return 
         await self.post(
             url=f"{CONTROL_URL_BASE}/groups/{group.id}/playback/play"
