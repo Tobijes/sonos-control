@@ -109,6 +109,17 @@ async def toggle():
     await sonos_control.group_toggle()
     return "Ok"
 
+@app.get("/sleep", summary="Endpoint for triggering sleep mode", tags=["Speakers"])
+async def sleep():
+    await sonos_control.run_sleep_procedure()
+    return "Ok"
+
+@app.get("/favorites", summary="Endpoint for triggering sleep mode", tags=["Data"])
+async def sleep():
+    data = await sonos_control.get_favorites()
+    return data
+
+
 @app.exception_handler(APIHandledError)
 async def not_authorized_handler(request: Request, exc: APIHandledError):
     return JSONResponse(status_code=exc.status_code, content={"message": exc.message})

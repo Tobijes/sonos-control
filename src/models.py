@@ -39,12 +39,17 @@ class Authorization:
         json_str = json.dumps(asdict(self), cls=DateTimeEncoder)
         return json_str
 
+@dataclass(frozen=True)
+class Player:
+    id: str
+    name: str
+
 @dataclass
 class Group:
     id: str
     name: str
     playback_state: str
-    player_ids: list[str]
+    players: list[Player]
     playback_type: str = None
 
     @property
@@ -58,8 +63,6 @@ class Group:
     @property
     def controllable(self) -> bool:
         return self.playback_type != c.PLAYBACK_STATE_HDMI
-    
-
 
 @dataclass
 class Favorite:

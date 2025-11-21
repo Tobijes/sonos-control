@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 from datetime import datetime, timedelta
 import math
@@ -7,7 +8,7 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from src.auth import SonosAuth
-from src.models import Group, Favorite
+from src.models import Group, Favorite, Player
 from src.constants import STATE_PLAYING
 
 # SONOS API URLs
@@ -115,7 +116,8 @@ class SonosControl:
         if len(groups) == 0:
             return None
         
-        groups = [Group(id=g["id"], name=g["name"], playback_state=g["playbackState"], player_ids=g["playerIds"]) for g in groups]
+        players = [Player(id=player["id"], name=player["name"]) for player in data["players"]]
+        groups = [Group(id=g["id"], name=g["name"], playback_state=g["playbackState"], players=players) for g in groups]
 
         for group in groups:
             if group.playback_state == STATE_PLAYING:
@@ -134,7 +136,7 @@ class SonosControl:
         """Get the Favorites"""  
         household_id = await self.get_household_id()
         data = await self.get(url=f"{CONTROL_URL_BASE}/households/{household_id}/favorites")
-        
+
         favorites = data["items"]
         if len(favorites) == 0:
             return None
@@ -171,13 +173,13 @@ class SonosControl:
         volume = 20 if now.hour >= 8 and now.hour < 22 else 15
 
         # Set all players volume to standard level. Kick off REST calls and await later    
-        player_ids = [player_id for group in groups for player_id in group.player_ids]
         print(f"Setting players volume to {volume}", flush=True)
-        set_player_volume_coroutines = [self.set_player_volume(player_id=player_id, volume=volume) for player_id in player_ids]
+        players = set([player for group in groups for player in group.players])
+        set_player_volume_coroutines = [self.set_player_volume(player=player, volume=volume) for player in players]
 
         # Gather all players in a single group. If already a single group, just reuse.
         if len(groups) > 1:
-            group = await self.create_group(player_ids=player_ids)
+            group = await self.create_group(players=players)
             print("Created group:", group, flush=True)
         else:
             group = groups[0]
@@ -187,7 +189,8 @@ class SonosControl:
         await asyncio.gather(*set_player_volume_coroutines)
 
         # Load first favorite onto the group with playback if possible, otherwise just play
-        favorites = await favorites_coroutine
+        favorites: list[Favorite] = await favorites_coroutine
+        favorites = [favorite for  favorite in favorites if favorite.name == "DR P3"]
         if len(favorites) > 0:
             # Load favorite onto group
             await self.play_favorite(group=group, favorite_id=favorites[0].favorite_id)
@@ -195,6 +198,38 @@ class SonosControl:
             # Play last played content
             await self.play_group(group)
         
+    async def run_sleep_procedure(self, groups=None):
+        """"""
+        if not ALLOW_WRITE:
+            return
+        sleep_player_names = ["Soveværelse"]
+
+        favorites_coroutine = self.get_favorites()
+        if groups is None:
+            groups = await self.get_groups()
+
+        await self.pause_all_groups(groups)
+
+        players = set([player for group in groups for player in group.players])
+        sleep_players = [player for player in players if player.name in sleep_player_names]
+
+        if len(sleep_players) == 0:
+            raise Exception("No sleep players found")
+        
+
+        group = await self.create_group(players=sleep_players)
+        volume = 1
+        set_player_volume_coroutines = [self.set_player_volume(player=player, volume=volume) for player in sleep_players]
+        
+        # Await all volumes to be set (call started off earlier)
+        await asyncio.gather(*set_player_volume_coroutines)
+
+        favorites: list[Favorite] = await favorites_coroutine
+        favorites = [favorite for favorite in favorites if favorite.name == "Relaxed Goodnight Piano for Autumn Nights"]
+        if len(favorites) > 0:
+            # Load favorite onto group
+            await self.play_favorite(group, favorite_id=favorites[0].favorite_id)
+
         
     async def pause_all_groups(self, groups=None):
         """Pauses all groups"""
@@ -214,15 +249,15 @@ class SonosControl:
             groups = await self.get_groups()
         await asyncio.gather(*[self.play_group(group) for group in groups])
 
-    async def create_group(self, player_ids: list[str]):
-        """Groups the **player_ids** into a single group"""
+    async def create_group(self, players: list[Player]):
+        """Groups the **players** into a single group"""
         household_id = await self.get_household_id()
         new_group_json = await self.post(
             url=f"{CONTROL_URL_BASE}/households/{household_id}/groups/createGroup",
-            json={ "playerIds": player_ids }
+            json={ "playerIds": [player.id for player in players] }
         )
         g = new_group_json["group"]
-        group = Group(id=g["id"], name=g["name"], playback_state="", player_ids=g["playerIds"])
+        group = Group(id=g["id"], name=g["name"], playback_state="", players=players)
         return group
 
     async def pause_group(self, group: Group):
@@ -243,10 +278,10 @@ class SonosControl:
             url=f"{CONTROL_URL_BASE}/groups/{group.id}/playback/play"
         )
         
-    async def set_player_volume(self, player_id: str, volume: int):
+    async def set_player_volume(self, player: Player, volume: int):
         """Sets the volume on an individual player"""
         await self.post(
-            url=f"{CONTROL_URL_BASE}/players/{player_id}/playerVolume",
+            url=f"{CONTROL_URL_BASE}/players/{player.id}/playerVolume",
             json={ "volume": volume }
         )
 

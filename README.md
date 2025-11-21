@@ -22,21 +22,11 @@ The hardware client is an ESP32 device that is powered from the wall with button
 Create an `.env` file from the `.env.template` and fill out the details. 
 
 ## Python
-If on an new Ubuntu machine. Install virtual environments
-```
-sudo apt install python3.12-venv
-```
-
-Create a Python virtual environment, initialize and install dependencies
-```
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements
-```
+Use `uv`
 
 Run the application from root folder using 
 ```
-uvicorn src.api:app --env-file .env
+uv run uvicorn src.api:app --env-file .env
 ```
 
 ## `ngrok`
