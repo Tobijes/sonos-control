@@ -62,7 +62,7 @@ class Group:
     
     @property
     def controllable(self) -> bool:
-        return self.playback_type != c.PLAYBACK_STATE_HDMI
+        return self.playback_type not in [c.PLAYBACK_STATE_HDMI, None]
 
 @dataclass
 class Favorite:

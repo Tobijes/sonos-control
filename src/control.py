@@ -17,6 +17,21 @@ CONTROL_URL_BASE = "https://api.ws.sonos.com/control/api/v1"
 ALLOW_WRITE = bool(os.getenv("ALLOW_WRITE", False))
 print("Allow write to Sonos", ALLOW_WRITE, flush=True)
 
+RADIO_FAVORITE_NAME = os.getenv("RADIO_FAVORITE_NAME", "DR P3")
+print("Radio favorite name", RADIO_FAVORITE_NAME, flush=True)
+
+SLEEP_ROOM_NAME = os.getenv("SLEEP_ROOM_NAME", "Soveværelse")
+print("Sleep room name", SLEEP_ROOM_NAME, flush=True)
+
+SLEEP_VOLUME = int(os.getenv("SLEEP_VOLUME", "2"))
+print("Sleep volume", SLEEP_VOLUME, flush=True)
+
+SLEEP_SECONDS = int(os.getenv("SLEEP_SECONDS", "900"))
+print("Sleep seconds", SLEEP_SECONDS, flush=True)
+
+SLEEP_FAVORITE_NAME = os.getenv("SLEEP_FAVORITE_NAME", "Relaxed Goodnight Piano for Autumn Nights")
+print("Sleep favorite name", SLEEP_FAVORITE_NAME, flush=True)
+
 def millis(delta: timedelta):
     return math.ceil(delta.microseconds/1000)
 
@@ -27,6 +42,7 @@ class SonosControl:
 
     # States (without persistence across restarts)
     last_toggled: datetime = None
+    sleep_timer: asyncio.Task = None
 
     def __init__(self, sonos_auth, client):
         self.sonos_auth = sonos_auth
@@ -40,7 +56,7 @@ class SonosControl:
                 response = await self.client.get(url, headers=headers, params=params)
                 print(f"GET {millis(response.elapsed)}ms {url=}", flush=True)
                 break
-            except httpx.ConnectTimeout as exc:
+            except (httpx.ConnectTimeout, httpx.ReadTimeout) as exc:
                 print(f"GET {url=} failed. Retrying...", flush=True)
                 if i == tries-1: # No more tries
                     raise Exception(f"GET {url=} Exceeded retries") from exc
@@ -60,7 +76,7 @@ class SonosControl:
                 response = await self.client.post(url, headers=headers, json=json)
                 print(f"POST {millis(response.elapsed)}ms {url=}", flush=True)
                 break
-            except httpx.ConnectTimeout as exc:
+            except (httpx.ConnectTimeout, httpx.ReadTimeout) as exc:
                 print(f"POST {url=} failed. Retrying...", flush=True)
                 if i == tries-1: # No more tries
                     raise Exception(f"POST {url=} Exceeded retries") from exc
@@ -80,7 +96,7 @@ class SonosControl:
                 response = await self.client.delete(url, headers=headers, params=params)
                 print(f"DELETE {millis(response.elapsed)}ms {url=}", flush=True)
                 break
-            except httpx.ConnectTimeout as exc:
+            except (httpx.ConnectTimeout, httpx.ReadTimeout) as exc:
                 print(f"DELETE {url=} failed. Retrying...", flush=True)
                 if i == tries-1: # No more tries
                     raise Exception(f"DELETE {url=} Exceeded retries") from exc
@@ -116,12 +132,12 @@ class SonosControl:
         if len(groups) == 0:
             return None
         
-        players = [Player(id=player["id"], name=player["name"]) for player in data["players"]]
-        groups = [Group(id=g["id"], name=g["name"], playback_state=g["playbackState"], players=players) for g in groups]
+        players = {player["id"]: Player(id=player["id"], name=player["name"]) for player in data["players"]}
+        groups = [Group(id=g["id"], name=g["name"], playback_state=g["playbackState"], players=[players[player_id] for player_id in g["playerIds"]]) for g in groups]
 
         for group in groups:
-            if group.playback_state == STATE_PLAYING:
-                data = await self.get_playback_metadata(group)
+            data = await self.get_playback_metadata(group)
+            if "type" in data["container"]:
                 group.playback_type = data["container"]["type"]
 
         return groups
@@ -147,6 +163,8 @@ class SonosControl:
 
     async def group_toggle(self):
         """Toggles between playing and pausing based on previous state"""
+        self.cancel_sleep_timer()
+
         groups = await self.get_groups()
 
         if all(group.playable or not group.controllable for group in groups):
@@ -164,6 +182,7 @@ class SonosControl:
         # Check if allowed to change real settings
         if not ALLOW_WRITE:
             return
+
         favorites_coroutine = self.get_favorites()
         if groups is None:
             groups = await self.get_groups()
@@ -174,7 +193,7 @@ class SonosControl:
 
         # Set all players volume to standard level. Kick off REST calls and await later    
         print(f"Setting players volume to {volume}", flush=True)
-        players = set([player for group in groups for player in group.players])
+        players = [player for group in groups for player in group.players]
         set_player_volume_coroutines = [self.set_player_volume(player=player, volume=volume) for player in players]
 
         # Gather all players in a single group. If already a single group, just reuse.
@@ -190,7 +209,7 @@ class SonosControl:
 
         # Load first favorite onto the group with playback if possible, otherwise just play
         favorites: list[Favorite] = await favorites_coroutine
-        favorites = [favorite for  favorite in favorites if favorite.name == "DR P3"]
+        favorites = [favorite for  favorite in favorites if favorite.name == SLEEP_FAVORITE_NAME]
         if len(favorites) > 0:
             # Load favorite onto group
             await self.play_favorite(group=group, favorite_id=favorites[0].favorite_id)
@@ -199,10 +218,10 @@ class SonosControl:
             await self.play_group(group)
         
     async def run_sleep_procedure(self, groups=None):
-        """"""
+        """Runs *Sleep Procedure*: Pause all groups, create group with sleep room, set volume to 1, play sleep favorite"""
+        # Check if allowed to change real settings
         if not ALLOW_WRITE:
             return
-        sleep_player_names = ["Soveværelse"]
 
         favorites_coroutine = self.get_favorites()
         if groups is None:
@@ -211,26 +230,39 @@ class SonosControl:
         await self.pause_all_groups(groups)
 
         players = set([player for group in groups for player in group.players])
-        sleep_players = [player for player in players if player.name in sleep_player_names]
+        sleep_players = [player for player in players if player.name == SLEEP_ROOM_NAME]
 
         if len(sleep_players) == 0:
             raise Exception("No sleep players found")
         
-
         group = await self.create_group(players=sleep_players)
-        volume = 1
-        set_player_volume_coroutines = [self.set_player_volume(player=player, volume=volume) for player in sleep_players]
+        set_player_volume_coroutines = [self.set_player_volume(player=player, volume=SLEEP_VOLUME) for player in sleep_players]
         
         # Await all volumes to be set (call started off earlier)
         await asyncio.gather(*set_player_volume_coroutines)
 
         favorites: list[Favorite] = await favorites_coroutine
-        favorites = [favorite for favorite in favorites if favorite.name == "Relaxed Goodnight Piano for Autumn Nights"]
+        favorites = [favorite for favorite in favorites if favorite.name == SLEEP_FAVORITE_NAME]
         if len(favorites) > 0:
             # Load favorite onto group
             await self.play_favorite(group, favorite_id=favorites[0].favorite_id)
 
-        
+        # Start sleep timer to pause after 15 minutes
+        self.cancel_sleep_timer()
+        self.sleep_timer = asyncio.create_task(self.sleep_timer_task())
+
+    async def sleep_timer_task(self, seconds=900):
+        print("Sleeping for", seconds, "seconds", flush=True)
+        await asyncio.sleep(10)  # Sleep for 30 minutes
+        print("Sleep timer elapsed, pausing all groups", flush=True)
+        await self.pause_all_groups()
+
+    def cancel_sleep_timer(self):
+        if self.sleep_timer:
+            print("Cancelling existing sleep timer", flush=True)
+            self.sleep_timer.cancel()
+            self.sleep_timer = None
+
     async def pause_all_groups(self, groups=None):
         """Pauses all groups"""
         # Check if allowed to change real settings
