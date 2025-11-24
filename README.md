@@ -24,14 +24,7 @@ Create an `.env` file from the `.env.template` and fill out the details.
 ## Python
 Use `uv`
 
-Make sure the VS Code setting `python.terminal.useEnvFile` is enabled
-
 Run the application from root folder using 
-```
-uv run uvicorn src.api:app 
-```
-
-or run with 
 ```
 uv run uvicorn src.api:app --env-file .env
 ```

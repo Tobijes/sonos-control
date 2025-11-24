@@ -41,6 +41,6 @@ WORKDIR /app
 # Run the FastAPI application by default
 ENV UVICORN_PORT=80
 ENV UVICORN_HOST=0.0.0.0
+ENV PYTHONUNBUFFERED=1
 
-ENTRYPOINT [ "uvicorn" ]
-CMD [ "src.api:app" ]
+CMD [ "uvicorn", "src.api:app" ]

@@ -209,12 +209,13 @@ class SonosControl:
 
         # Load first favorite onto the group with playback if possible, otherwise just play
         favorites: list[Favorite] = await favorites_coroutine
-        favorites = [favorite for  favorite in favorites if favorite.name == SLEEP_FAVORITE_NAME]
+        favorites = [favorite for  favorite in favorites if favorite.name == RADIO_FAVORITE_NAME]
         if len(favorites) > 0:
             # Load favorite onto group
             await self.play_favorite(group=group, favorite_id=favorites[0].favorite_id)
         else:
             # Play last played content
+            print("No favorite found, just playing", flush=True)
             await self.play_group(group)
         
     async def run_sleep_procedure(self, groups=None):
@@ -246,7 +247,8 @@ class SonosControl:
         if len(favorites) > 0:
             # Load favorite onto group
             await self.play_favorite(group, favorite_id=favorites[0].favorite_id)
-
+        else:
+            print("No favorite found, not playing", flush=True)
         # Start sleep timer to pause after 15 minutes
         self.cancel_sleep_timer()
         self.sleep_timer = asyncio.create_task(self.sleep_timer_task())
