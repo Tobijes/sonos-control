@@ -169,15 +169,15 @@ class SonosControl:
 
         if all(group.playable or not group.controllable for group in groups):
             if self.last_toggled is None or (datetime.now() - self.last_toggled) > timedelta(hours=1):
-                await self.group_and_play_all_groups(groups)
+                await self.group_and_play_favorite(groups)
             else:
-                await self.play_all_groups()
+                await self.group_with_largest_and_play(groups)
         else:
             await self.pause_all_groups(groups)
 
         self.last_toggled = datetime.now()
 
-    async def group_and_play_all_groups(self, groups=None):
+    async def group_and_play_favorite(self, groups=None):
         """Runs *Play Procedure*: Group all speakers, set volume to 15% or 20% based on hour, start playback"""
         # Check if allowed to change real settings
         if not ALLOW_WRITE:
@@ -187,22 +187,25 @@ class SonosControl:
         if groups is None:
             groups = await self.get_groups()
 
-        # Determine volume level based on time
-        now = datetime.now(ZoneInfo("Europe/Copenhagen"))
-        volume = 20 if now.hour >= 8 and now.hour < 22 else 15
-
-        # Set all players volume to standard level. Kick off REST calls and await later    
+        # Set all players volume to standard level. Kick off REST calls and await later  
+        volume = self.get_preferred_volume()  
         print(f"Setting players volume to {volume}", flush=True)
         players = [player for group in groups for player in group.players]
         set_player_volume_coroutines = [self.set_player_volume(player=player, volume=volume) for player in players]
 
-        # Gather all players in a single group. If already a single group, just reuse.
-        if len(groups) > 1:
+        # Gather all players in a single group, reuse if possible
+        if len(groups) == 0:
             group = await self.create_group(players=players)
             print("Created group:", group, flush=True)
-        else:
+        elif len(groups) == 1:
             group = groups[0]
             print("Reusing group:", group, flush=True)
+        else:
+            sizes = [len(group.players) for group in groups]
+            group_idx = sizes.index(max(sizes))
+            group = groups[group_idx]
+            await self.set_group_members(group, players)
+            print("Unifying to group:", group, flush=True)
         
         # Await all volumes to be set (call started off earlier)
         await asyncio.gather(*set_player_volume_coroutines)
@@ -217,6 +220,40 @@ class SonosControl:
             # Play last played content
             print("No favorite found, just playing", flush=True)
             await self.play_group(group)
+    
+    async def group_with_largest_and_play(self, groups=None):
+        """Runs *Play Procedure*: Group all speakers, set volume , start playback"""
+        # Check if allowed to change real settings
+        if not ALLOW_WRITE:
+            return
+
+        if groups is None:
+            groups = await self.get_groups()
+
+        # Set all players volume to standard level. Kick off REST calls and await later    
+        volume = self.get_preferred_volume()
+        print(f"Setting players volume to {volume}", flush=True)
+        players = [player for group in groups for player in group.players]
+        set_player_volume_coroutines = [self.set_player_volume(player=player, volume=volume) for player in players]
+
+        # Gather all players in a single group, reuse if possible
+        if len(groups) == 0:
+            group = await self.create_group(players=players)
+            print("Created group:", group, flush=True)
+        elif len(groups) == 1:
+            group = groups[0]
+            print("Reusing group:", group, flush=True)
+        else:
+            sizes = [len(group.players) for group in groups]
+            group_idx = sizes.index(max(sizes))
+            group = groups[group_idx]
+            await self.set_group_members(group, players)
+            print("Unifying to group:", group, flush=True)
+
+        # Await all volumes to be set (call started off earlier)
+        await asyncio.gather(*set_player_volume_coroutines)
+
+        await self.play_group(group)
         
     async def run_sleep_procedure(self, groups=None):
         """Runs *Sleep Procedure*: Pause all groups, create group with sleep room, set volume to 1, play sleep favorite"""
@@ -294,6 +331,14 @@ class SonosControl:
         group = Group(id=g["id"], name=g["name"], playback_state="", players=players)
         return group
 
+    async def set_group_members(self, group: Group, players: list[Player]):
+        if not ALLOW_WRITE:
+            return
+        await self.post(
+            url=f"{CONTROL_URL_BASE}/groups/{group.id}/groups/setGroupMembers",
+            json={ "playerIds": [player.id for player in players] }
+        )
+
     async def pause_group(self, group: Group):
         """Pause a single group"""
         # Check that we don't command pause on a HDMI playing session
@@ -328,3 +373,10 @@ class SonosControl:
                 "playOnCompletion": True
             }
         )
+
+    def get_preferred_volume(self):
+        # Determine volume level based on time
+        now = datetime.now(ZoneInfo("Europe/Copenhagen"))
+        volume = 20 if now.hour >= 8 and now.hour < 22 else 15
+
+        return volume

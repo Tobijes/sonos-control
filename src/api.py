@@ -91,7 +91,7 @@ async def callback(request: Request):
 
 @app.get("/groupplay", summary="Endpoint for triggering Group & Play action: Group all speakers, set volume to 15%, start playback", tags=["Speakers"])
 async def play():
-    await sonos_control.group_and_play_all_groups()
+    await sonos_control.group_and_play_favorite()
     return "Ok"
 
 @app.get("/play", summary="Endpoint for triggering  Play action: Start playback on each group", tags=["Speakers"])
