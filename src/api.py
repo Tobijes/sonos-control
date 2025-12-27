@@ -11,6 +11,7 @@ from httpx import AsyncClient
 from src.models import APIHandledError, NotAuthorizedError
 from src.auth import SonosAuth
 from src.control import SonosControl
+from src.client import SonosClient
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,7 +31,8 @@ SERVICE_PASSWORD = os.getenv("SERVICE_PASSWORD")
 
 client = AsyncClient()
 sonos_auth = SonosAuth()
-sonos_control = SonosControl(sonos_auth, client)
+sonos_client = SonosClient(sonos_auth, client)
+sonos_control = SonosControl(sonos_client)
 app = FastAPI(lifespan=lifespan)
 
 def check_permission(method, path, auth):
@@ -57,19 +59,18 @@ async def check_authentication(request: Request, call_next):
         return JSONResponse(None, 401, {"WWW-Authenticate": "Basic"})
     return await call_next(request)
 
-@app.get("/", tags=["Speakers"])
+@app.get("/", tags=["Data"])
 async def root():
-    household_id, groups, favorites = await asyncio.gather(
+    household_id, groups = await asyncio.gather(
         sonos_control.get_household_id(),
-        sonos_control.get_groups(),
-        sonos_control.get_favorites()
+        sonos_control.get_groups()
     )
 
     return {
         "message": "Welcome to the Sonos API Service", 
         "household_id":household_id, 
         "groups": groups,
-        "favorites": favorites 
+        "favorites": sonos_control.favorites 
     }
 
 @app.get("/login", summary="Endpoint for authenticating with Sonos account", tags=["Auth"])
@@ -89,32 +90,32 @@ async def callback(request: Request):
 
     return RedirectResponse("/")
 
-@app.get("/groupplay", summary="Endpoint for triggering Group & Play action: Group all speakers, set volume to 15%, start playback", tags=["Speakers"])
-async def play():
-    await sonos_control.group_and_play_favorite()
-    return "Ok"
-
-@app.get("/play", summary="Endpoint for triggering  Play action: Start playback on each group", tags=["Speakers"])
-async def play():
-    await sonos_control.play_all_groups()
-    return "Ok"
-
-@app.get("/pause", summary="Endpoint for triggering Pause action: Pause each group", tags=["Speakers"])
-async def pause():
-    await sonos_control.pause_all_groups()
-    return "Ok"
-
-@app.get("/toggle", summary="Endpoint for triggering play or pause depending on state", tags=["Speakers"])
+@app.get("/toggle", summary="Endpoint for triggering play or pause depending on state", tags=["Service"])
 async def toggle():
     await sonos_control.group_toggle()
     return "Ok"
 
-@app.get("/sleep", summary="Endpoint for triggering sleep mode", tags=["Speakers"])
+@app.get("/sleep", summary="Endpoint for triggering sleep mode", tags=["Service"])
 async def sleep():
     await sonos_control.run_sleep_procedure()
     return "Ok"
 
-@app.get("/favorites", summary="Endpoint for triggering sleep mode", tags=["Data"])
+@app.get("/action/groupplay", summary="Endpoint for triggering Group & Play action: Group all speakers, set volume to 15%, start playback", tags=["Actions"])
+async def play():
+    await sonos_control.group_and_play()
+    return "Ok"
+
+@app.get("/action/play", summary="Endpoint for triggering  Play action: Start playback on each group", tags=["Actions"])
+async def play():
+    await sonos_control.play_all_groups()
+    return "Ok"
+
+@app.get("/action/pause", summary="Endpoint for triggering Pause action: Pause each group", tags=["Actions"])
+async def pause():
+    await sonos_control.pause_all_groups()
+    return "Ok"
+
+@app.get("/data/favorites", summary="Endpoint for triggering sleep mode", tags=["Data"])
 async def sleep():
     data = await sonos_control.get_favorites()
     return data
