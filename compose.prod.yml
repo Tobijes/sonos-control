@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/tobijes/sonos-control--client:latest
+    image: ghcr.io/tobijes/sonos-control--app:latest
     environment:
       REDIRECT_URI: ${REDIRECT_URI:?}
       CLIENT_ID: ${CLIENT_ID:?}
