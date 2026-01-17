@@ -37,7 +37,7 @@ app = FastAPI(lifespan=lifespan)
 
 def check_permission(method, path, auth):
     # The following paths are always allowed:
-    if method == 'GET' and path in ['/', '/docs', '/openapi.json', '/favicon.ico']:
+    if method == 'GET' and path in ['/', '/health', '/docs', '/openapi.json', '/favicon.ico']:
         return True
     
     # Parse auth header and check scheme, username and password
