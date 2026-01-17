@@ -26,6 +26,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Then, use a final image without uv
 FROM debian:bookworm-slim
 
+# Install curl and clean up in one layer
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy the Python version
 COPY --from=builder --chown=python:python /python /python
 
@@ -42,5 +47,7 @@ WORKDIR /app
 ENV UVICORN_PORT=80
 ENV UVICORN_HOST=0.0.0.0
 ENV PYTHONUNBUFFERED=1
+
+EXPOSE 80
 
 CMD [ "uvicorn", "src.api:app" ]

@@ -1,0 +1,27 @@
+services:
+  app:
+    image: ghcr.io/tobijes/sonos-control--client:latest
+    environment:
+      REDIRECT_URI: ${REDIRECT_URI:?}
+      CLIENT_ID: ${CLIENT_ID:?}
+      CLIENT_SECRET: ${CLIENT_SECRET:?}
+      SERVICE_PASSWORD: ${SERVICE_PASSWORD:?}
+      ALLOW_WRITE: true
+      RADIO_FAVORITE_NAME: ${RADIO_FAVORITE_NAME}
+      SLEEP_ROOM_NAME: ${SLEEP_ROOM_NAME}
+      SLEEP_VOLUME: ${SLEEP_VOLUME}
+      SLEEP_SECONDS: ${SLEEP_SECONDS}
+      SLEEP_FAVORITE_NAME: ${SLEEP_FAVORITE_NAME}
+    volumes:
+      - auth-data:/app/data
+    restart: always
+    healthcheck:
+      # Use curl to check the local index page; -f fails silently on server errors
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  auth-data:
