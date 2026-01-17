@@ -14,6 +14,7 @@ services:
       SLEEP_FAVORITE_NAME: ${SLEEP_FAVORITE_NAME}
     volumes:
       - auth-data:/app/data
+    pull_policy: always
     restart: always
     healthcheck:
       # Use curl to check the local index page; -f fails silently on server errors
