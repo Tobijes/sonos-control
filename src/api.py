@@ -59,6 +59,13 @@ async def check_authentication(request: Request, call_next):
         return JSONResponse(None, 401, {"WWW-Authenticate": "Basic"})
     return await call_next(request)
 
+@app.get("/health", tags=["System"])
+async def health():
+    return JSONResponse(
+        content={"status": "healthy"},
+        status_code=200
+    )
+
 @app.get("/", tags=["Data"])
 async def root():
     household_id, groups = await asyncio.gather(
