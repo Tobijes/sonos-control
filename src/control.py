@@ -188,9 +188,9 @@ class SonosControl:
         self.cancel_sleep_timer()
         self.sleep_timer = asyncio.create_task(self.sleep_timer_task())
 
-    async def sleep_timer_task(self, seconds=900):
-        print("Sleeping for", seconds, "seconds", flush=True)
-        await asyncio.sleep(seconds)  # Sleep for 30 minutes
+    async def sleep_timer_task(self):
+        print("Sleeping for", SLEEP_SECONDS, "seconds", flush=True)
+        await asyncio.sleep(SLEEP_SECONDS)  # Sleep for 30 minutes
         print("Sleep timer elapsed, pausing all groups", flush=True)
         await self.pause_all_groups()
 
