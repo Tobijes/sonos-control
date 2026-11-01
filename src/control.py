@@ -267,6 +267,6 @@ class SonosControl:
     def get_preferred_volume(self):
         # Determine volume level based on time
         now = datetime.now(ZoneInfo("Europe/Copenhagen"))
-        volume = 20 if now.hour >= 8 and now.hour < 22 else 15
-
+        # volume = 20 if now.hour >= 8 and now.hour < 22 else 15
+        volume = 15
         return volume
